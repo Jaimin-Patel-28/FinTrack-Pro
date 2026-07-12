@@ -803,9 +803,11 @@
         <section class="form-container">
           <form class="add-transaction" id="tx-form">
             <div class="form-heading">
-              <h4>Add Transaction</h4>
+              <h4 id="modal-title">Add Transaction</h4>
               <i class="ri-close-line" id="modal-close-icon"></i>
             </div>
+
+            <input type="hidden" id="tx-id" value="" />
 
             <label>Type</label>
             <select id="tx-type" class="form-input">
@@ -1113,7 +1115,12 @@
               <td><span style="background: var(--input-bg); padding: 4px 8px; border-radius: 4px; font-size: 12px;">${txObj.category}</span></td>
               <td style="${displayColor}">${displayPrefix}${chosenCurrencySymbol}${numericAmount.toFixed(2)}</td>
               <td class="action-btns">
-                <button class="delete-row-btn" onclick="deleteTransactionItem(${txObj.id})"><i class="ri-delete-bin-line"></i></button>
+                <button class="edit-row-btn" style="color: #0066cc; background: transparent; border: none; cursor: pointer; font-size: 16px; margin-right: 8px;" onclick="openEditModal(${txObj.id})">
+                  <i class="ri-edit-line"></i>
+                </button>
+                <button class="delete-row-btn" onclick="deleteTransactionItem(${txObj.id})">
+                  <i class="ri-delete-bin-line"></i>
+                </button>
               </td>
             `;
             targetTableBody.appendChild(tableRowElement);
@@ -1259,6 +1266,113 @@
         );
         refreshUIEngine();
       };
+
+      // --- 1. Function to look up an item and populate the edit modal ---
+      window.openEditModal = function (targetRecordId) {
+        let currentTxDataList =
+          JSON.parse(
+            localStorage.getItem("transactions_" + currentLoggedInUser),
+          ) || [];
+
+        // Find the exact item using a simple loop or find method
+        let itemToEdit = currentTxDataList.find(
+          (item) => item.id === targetRecordId,
+        );
+        if (!itemToEdit) return;
+
+        // Pre-populate all fields in the form modal
+        document.getElementById("tx-id").value = itemToEdit.id;
+        document.getElementById("tx-type").value = itemToEdit.type;
+        document.getElementById("tx-desc").value = itemToEdit.description;
+        document.getElementById("tx-amount").value = itemToEdit.amount;
+        document.getElementById("tx-date").value = itemToEdit.date;
+        document.getElementById("tx-category").value = itemToEdit.category;
+
+        // Change the modal header title and button text
+        document.getElementById("modal-title").innerText = "Edit Transaction";
+        document.querySelector(".add-transaction .save-form").innerText =
+          "Update Transaction";
+
+        // Open the modal container layout view
+        txModalOverlay.style.display = "flex";
+      };
+
+      // --- 2. Update your existing modal Reset when closing ---
+      modalCloseIcon.addEventListener("click", () => {
+        txModalOverlay.style.display = "none";
+        transactionFormElement.reset();
+        // Always restore defaults on close
+        document.getElementById("tx-id").value = "";
+        document.getElementById("modal-title").innerText = "Add Transaction";
+        document.querySelector(".add-transaction .save-form").innerText =
+          "Save Transaction";
+      });
+
+      // --- 3. Replace your old form submission listener with this dual Add/Edit logic ---
+      transactionFormElement.addEventListener("submit", (e) => {
+        e.preventDefault();
+
+        let hiddenId = document.getElementById("tx-id").value;
+        let inputType = document.getElementById("tx-type").value;
+        let inputDesc = document.getElementById("tx-desc").value.trim();
+        let inputAmount = parseFloat(
+          document.getElementById("tx-amount").value,
+        );
+        let inputDate = document.getElementById("tx-date").value;
+        let inputCategory = document.getElementById("tx-category").value;
+
+        if (!inputDesc || isNaN(inputAmount) || !inputDate) {
+          alert("Please fill all form input spaces correctly.");
+          return;
+        }
+
+        let currentTxDataList =
+          JSON.parse(
+            localStorage.getItem("transactions_" + currentLoggedInUser),
+          ) || [];
+
+        if (hiddenId !== "") {
+          // EDIT MODE: Find the transaction row matching the ID and replace its properties
+          for (let i = 0; i < currentTxDataList.length; i++) {
+            if (currentTxDataList[i].id == hiddenId) {
+              currentTxDataList[i].type = inputType;
+              currentTxDataList[i].description = inputDesc;
+              currentTxDataList[i].amount = inputAmount;
+              currentTxDataList[i].date = inputDate;
+              currentTxDataList[i].category = inputCategory;
+              break;
+            }
+          }
+        } else {
+          // ADD MODE: Push a fresh transaction object container with standard timestamp id
+          let itemPayload = {
+            id: Date.now(),
+            type: inputType,
+            description: inputDesc,
+            amount: inputAmount,
+            date: inputDate,
+            category: inputCategory,
+          };
+          currentTxDataList.push(itemPayload);
+        }
+
+        // Save back updated array to local browser storage
+        localStorage.setItem(
+          "transactions_" + currentLoggedInUser,
+          JSON.stringify(currentTxDataList),
+        );
+
+        // Reset modal values completely
+        txModalOverlay.style.display = "none";
+        transactionFormElement.reset();
+        document.getElementById("tx-id").value = "";
+        document.getElementById("modal-title").innerText = "Add Transaction";
+        document.querySelector(".add-transaction .save-form").innerText =
+          "Save Transaction";
+
+        // Sync view components layout arrays
+        refreshUIEngine();
+      });
 
       // Change Application Settings Profile Details Handler
       saveSettingsBtn.addEventListener("click", () => {
